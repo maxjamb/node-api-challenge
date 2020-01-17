@@ -1,14 +1,17 @@
 const express = require("express");
 const Projects = require("../data/helpers/projectModel");
-
+const Actions = require("../data/helpers/actionModel");
 const router = express.Router();
-
 router.get("/", (req, res, next) => {
   Projects.get()
     .then(projects => {
       res.status(200).json(projects);
     })
     .catch(next);
+});
+
+router.get("/:id", validateProjectId, (req, res) => {
+  res.status(200).json(req.project);
 });
 
 router.post("/", validateProjectsBody, (req, res, next) => {
@@ -19,7 +22,24 @@ router.post("/", validateProjectsBody, (req, res, next) => {
     })
     .catch(next);
 });
-
+router.post(
+  "/:id/actions",
+  validateProjectId,
+  validateActionsBody,
+  (req, res, next) => {
+    const { description, notes, completed } = req.body;
+    Actions.insert({
+      project_id: req.project.id,
+      description,
+      notes,
+      completed
+    })
+      .then(action => {
+        res.status(201).json(action);
+      })
+      .catch(next);
+  }
+);
 router.put(
   "/:id",
   validateProjectId,
@@ -33,7 +53,6 @@ router.put(
       .catch(next);
   }
 );
-
 router.delete("/:id", validateProjectId, (req, res, next) => {
   Projects.remove(req.project.id)
     .then(deleted => {
@@ -41,20 +60,32 @@ router.delete("/:id", validateProjectId, (req, res, next) => {
     })
     .catch(next);
 });
-
 function validateProjectsBody(req, res, next) {
   const { name, description, completed } = req.body;
-  if (!name || !description || typeof completed === "undefined") {
+  if (!name || !description) {
     res
       .status(400)
       .json({
-        message:
-          "Please provide the necessary name, description and completed fields!"
+        message: "Please provide the required name and description fields!"
       });
   }
   next();
 }
 
+function validateActionsBody(req, res, next) {
+  const { description, notes, completed } = req.body;
+  if (!name || !description) {
+    res
+      .status(400)
+      .json({
+        message: "Please provide the required description and notes fields!"
+      });
+  }
+  if (description.length > 128) {
+    res.status(400).json({ message: "Description is too long!" });
+  }
+  next();
+}
 function validateProjectsAtLeastOneBody(req, res, next) {
   const { name, description, completed } = req.body;
   if (!name && !description && typeof completed === "undefined") {
@@ -62,12 +93,11 @@ function validateProjectsAtLeastOneBody(req, res, next) {
       .status(400)
       .json({
         message:
-          "Please provide the necessary name, description and completed fields!"
+          "Please provide one of these fields to change: name, description or completed."
       });
   }
   next();
 }
-
 function validateProjectId(req, res, next) {
   const { id } = req.params;
   if (!id || parseInt(id) < 1) {
@@ -86,7 +116,6 @@ function validateProjectId(req, res, next) {
     })
     .catch(next);
 }
-
 router.use((error, req, res, next) => {
   res.status(500).json({
     file: "projectsRouter",
@@ -95,5 +124,4 @@ router.use((error, req, res, next) => {
     message: error.message
   });
 });
-
 module.exports = router;
